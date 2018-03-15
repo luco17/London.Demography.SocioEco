@@ -1,0 +1,89 @@
+# Loading packages #
+x <- c("maptools", "rgeos", "tidyr", "rgdal", "readxl", "dplyr", "ggplot2", "ggthemes", "RCurl")
+lapply(x,library,character.only=TRUE)
+
+#Custom colour conversion function #
+rgbconv<- function(r,g,b) {
+  d<-255
+  alpha<-r/d
+  bravo<-g/d
+  charlie<-b/d
+  defcol<-rgb(alpha,bravo,charlie)
+  return(defcol)
+}
+
+# Custom colours #
+savref<-rgbconv(110,183,181)
+savras<-rgbconv(158,31,94)
+savyel<-rgbconv(255,237,84)
+savpac<-rgbconv(168,196,226)
+savmar<-rgbconv(234,228,218)
+
+#Loading output area shapefile#
+ldnoa <- readOGR(dsn = "c:\\personal",layer="OA_2011_London_gen_MHW") %>% 
+         spTransform(CRS("+proj=longlat +datum=WGS84"))
+
+ldnb <- readOGR(dsn="c:\\personal",layer="London_Borough_Excluding_MHW") %>% 
+  spTransform(CRS("+proj=longlat +datum=WGS84"))
+
+
+#Checking data#
+head(ldnoa@data)
+pop <- read_excel("c:\\personal/POP2016ESTOA.xls",sheet=4,skip=4)
+
+#Manipulating data to create age brackets#
+`0-19` <- rowSums(pop[,4:23])
+`20-39` <- rowSums(pop[,24:43])
+`40-59` <- rowSums(pop[,44:63])
+`60-79` <- rowSums(pop[,64:83])
+`80+` <- rowSums(pop[,84:94])
+popmod <- cbind.data.frame(`0-19`,`20-39`,`40-59`,`60-79`,`80+`)
+popmod$OA11CD <- pop$OA11CD
+popmod$totages <- pop$`All Ages`
+
+# Merging and creating the spational points#
+ldndata <- merge(ldnoa@data, popmod, by = "OA11CD", sort = FALSE)
+ldndata <- ldndata[,-c(2,3,4,5,6,8,9,10,11,12,13,14,15,16,17)]
+
+'change the divisor to create more or less points, higher numbers = fewer'
+
+num.dots <- select(ldndata,`0-19`:`80+`)/20
+sp.dfs <- lapply(names(num.dots), function(x) {
+  dotsInPolys(ldnoa, as.integer(num.dots[,x]), f = "random")
+})
+
+#Creating palette#
+pal <- c("#8dd3c7", "#ffffb3", "#fb8072", "#bebada", "#80b1d3")
+
+#GG PLOT METHODS#
+ldnb@data$id <- row.names(ldnb@data)
+ldnb.points <- fortify(ldnb, region = "id")
+ldnb.df <- merge(ldnb.points,ldnb@data, by = "id")
+
+'test map'
+ggplot(ldnb.df, aes(long, lat, group = group))+
+  geom_path()+
+  coord_map()
+
+#Populating the points dataframe and creating age bands#
+dfs <- lapply(sp.dfs, function(x) {
+  data.frame(coordinates(x)[,1:2])
+})
+
+ages <- c("0-19","20-39","40-59","60-79","80+")
+
+'Assigning ages to the points dataframe'
+for (i in 1:length(ages)) {
+  dfs[[i]]$ages <- ages[i]
+}
+dots.final <- bind_rows(dfs)
+dots.final$ages <- factor(dots.final$ages, levels=ages)
+
+# Plotting the map # 
+ggplot(ldnb.df) +
+  geom_point(data = dots.final, aes(x = x, y = y, colour = ages), size = 0.015, alpha = 0.3) +
+  scale_colour_manual(values = pal) +
+  theme_map() +
+  theme(plot.background = element_rect(fill = "black")) +
+  coord_map() +
+  guides(colour = guide_legend(override.aes = list(size = 2, alpha = 1)))
