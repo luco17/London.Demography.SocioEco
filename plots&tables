@@ -1,0 +1,204 @@
+# Script for socio-eco and demographic analysis of London data # 
+
+x <- c("ggplot2", "readxl", "ggalt", "tidyr", "dplyr", "scales", "reshape2", "data.table")
+lapply(x, library, character.only = TRUE)
+
+#Setting colours#
+rgbconv<- function(r,g,b) {
+  d<-255
+  alpha<-r/d
+  bravo<-g/d
+  charlie<-b/d
+  defcol<-rgb(alpha,bravo,charlie)
+  return(defcol)
+}
+
+savnav<-rgbconv(0,34,68)
+savred<-rgbconv(206,24,31)
+savyel<-rgbconv(255,232,8)
+savras<-rgbconv(58,31,94)
+savcot<-rgbconv(236,248,254)
+savgre<-rgbconv(0,84,55)
+savlig<-rgbconv(191,202,213)
+savgra<-rgbconv(60,86,105)
+savmen<-rgbconv(0,100,112)
+
+#Reading in age data#
+setwd("Rdata and code") 'change to path where data is stored'
+age<-read_excel("Agefor.xlsx")
+age<-age[-20,]
+
+#Setting up the plot#
+gg<-ggplot(age,aes(x=`2017`,xend=`2037`,y=`AGE GROUP`,group=`AGE GROUP`))+
+  geom_dumbbell(size=1,colour_xend=savmen,colour_x=savras,size_x=3,size_xend=3,show.legend=TRUE)+
+  labs(x="Population 000's",y="Age group",title="Population composition 2017:2037")
+plot(gg)
+
+Age.pct<-read.table(file="clipboard",sep="\t",header=TRUE,stringsAsFactors = FALSE)
+rm(x)
+names(Age.pct)
+colsconv<-2:22
+Age.pct[colsconv]<-sapply(Age.pct[colsconv])
+gg<-ggplot(Age.pct,aes(x=X2017,xend=X2037,y=Age.Group,group=Age.Group))+
+  geom_dumbbell(size=1,colour_xend=savmen,colour_x=savras,size_x=3,size_xend=3,show.legend=TRUE)+
+  labs(x="% of population",y="Age group",title="Population composition 2017:2037")
+plot(gg)
+
+
+#OXec chart#
+oxec<-read_excel("Oxec emp.xlsx")
+oxec$change<-(oxec$`2027`/oxec$`2017`-1)*100
+oxec$type<-ifelse(oxec$change<0,"below","above")
+oxec<-oxec[order(oxec$change),]
+oxec$Indicator<-factor(oxec$Indicator,levels=oxec$Indicator)
+ggox<-ggplot(oxec,aes(x=Indicator,y=change,label=change))+
+  geom_bar(stat='identity',aes(fill=type),width=.5)+
+  scale_fill_manual(name="% Change",labels=c(">0","<0"),values=c("above"=savmen,"below"=savred))+
+  labs(subtitle="Employment growth by type 2017:2027",title="London",y="% change",x="Employment type")
+ggox+coord_flip()
+
+#Supply deficit chart#
+def<-read_excel("HHLD.xlsx")
+def$zs<-(def$Cumsum-mean(def$Cumsum))/sd(def$Cumsum)
+def$zs
+
+#ASHE chart#
+theme_set(theme_bw())
+ashe<-read_excel("ASHERES.xlsx")
+'removing the x values and replacing with blanks'
+ashe<-data.frame(lapply(ashe,gsub,pattern="x",replacement=""))
+ashe<-ashe[,-10]
+ashe[,3:14]<-apply(ashe[,3:14],2,function (x) as.numeric(as.character(x)))
+ashe[which(ashe$X50==max(ashe2$X50,na.rm=TRUE)),]
+ashe$Description<-as.character(ashe$Description)
+ashe$Description[ashe$Description=="Beley"]<-"Bexley"
+'Defining z-score'
+ashe$zs<-(ashe$X50-mean(ashe$X50,na.rm=TRUE))/sd(ashe$X50,na.rm=TRUE)
+ashe$score<-ifelse(ashe$zs<0,"Below","Above")
+'Sorting values'
+ashe2<-ashe[! ashe$Description %in% c("Kensington and Chelsea","City of London"),]
+ashe2<-ashe2[order(ashe2$zs),]
+ashe2$Description<-factor(ashe2$Description,levels=ashe2$Description)
+
+asheplot<-ggplot(ashe2,aes(x=Description,y=zs,label=zs))+
+  geom_bar(stat='identity',aes(fill=score),width=0.5)+
+  scale_fill_manual(name="Median earnings",labels=c("Above average","Below average"),values=c("Above"=savmen,"Below"=savred))+
+  labs(subtitle="ASHE 2017",title="Normalised Median Earnings",y="Z-Score",x="Borough")+
+  coord_flip()
+plot(asheplot)
+ashe2$Description
+
+#Population growth#
+pop<-read_excel("Pop.xlsx")
+names(pop)
+tosev<-pop[pop$Year %in% 2017,]
+ttsev<-pop[pop$Year %in% 2027,]
+fix(tosev)
+
+playtime<-data.frame(tosev$Total,ttsev$Total,tosev$Borough)
+playtime<-playtime[! playtime$tosev.Borough %in% c("England","City of London","England and Wales","United Kingdom","Great Britain","Greater London","Inner","Outer","Rest of Inner","Scotland","Wales","Northern Ireland","Central"),]
+playtime<-playtime[order(playtime$tosev.Total),]
+playtime$tosev.Borough<-factor(playtime$tosev.Borough,levels=playtime$tosev.Borough)
+playtime$tosev.Total<-playtime$tosev.Total/1000
+playtime$ttsev.Total<-playtime$ttsev.Total/1000
+options(scipen=999)
+
+popdum<-ggplot(playtime,aes(x=tosev.Total,xend=ttsev.Total,y=tosev.Borough,group=tosev.Borough))+
+  geom_dumbbell(color=savgra,size_x=2,size_xend=2,colour_xend=savmen,colour_x=savras,size=1)+
+  labs(x="Population (000's)",y="Borough",title="Population growth 2017:2027",subtitle="ONS Forecast")
+plot(popdum)
+#Population prime renter age dotplot#
+theme_set(theme_classic())
+primeage<-data.frame(tosev$`% of total`*100,tosev$Borough,tosev$Total)
+colnames(primeage)<-c("pct.prm","Borough","Total")
+primeage<-primeage[order(primeage$pct.prm),]
+primeage<-primeage[! primeage$Borough %in% c("England","City of London","England and Wales","United Kingdom","Great Britain","Greater London","Inner","Outer","Rest of Inner","Scotland","Wales","Northern Ireland","Central"),]
+primeage$Borough<-factor(primeage$Borough,levels=primeage$Borough)
+pyut<-ggplot(primeage,aes(x=Borough,y=pct.prm))+
+  geom_point(col=savgre,size=3)+
+  geom_segment(aes(x=Borough,xend=Borough,y=min(pct.prm),yend=max(pct.prm)),linetype="dashed",size=0.02,colour="light grey")+
+  labs(title="% of population in prime renter age (20-34)",subtitle="Source: Greater London Authority",y="% aged 20-34")+
+  coord_flip()
+plot(pyut)
+
+#PRS Tenure#
+ten<-read_excel("Tenure.xlsx")
+ten<-ten[ten$Year %in% c(1981,1991,2001,2011),]
+ten<-ten[!ten$Name %in% c("City of London","Inner London","Outer London"),]
+ten[,2:6]<-apply(ten[,2:6],2,function (x) as.numeric(as.character(x)))
+ten2011<-ten[ten$Year %in% 2011,]
+ten2001<-ten[ten$Year %in% 2001,]
+tenures<-data.frame(round(ten2011$`Private Rented`/ten2011$Total*100,2),round(ten2001$`Private Rented`/ten2001$Total*100,2),ten2001$Name)
+colnames(tenures)<-c("prop2011","prop2001","Borough")
+tenures<-tenures[order(tenures$prop2001),]
+tenures$Borough<-factor(tenures$Borough,levels=tenures$Borough)
+tendum<-ggplot(tenures,aes(x=prop2001,xend=prop2011,y=Borough,group=Borough))+
+  geom_dumbbell(color=savgra,size_x=2,size_xend=2,colour_x=savras,colour_xend=savmen,size=1)+
+  labs(x="PRS Tenure (%)",y="Borough",title="Households in PRS tenure",subtitle="Census data")+
+  theme(plot.title=element_text(size=11,face="bold"),plot.subtitle = element_text(size=9),axis.text.y=element_text(size=8),axis.title=element_text(size=8))
+plot(tendum)
+
+#HHLD Tenure#
+hhld<-read_excel("HHLD.xlsx")
+hhld<-hhld[order(hhld$Cumsum),]
+hhld$Borough<-factor(hhld$Borough,levels=hhld$Borough)
+hplt<-ggplot(hhld,aes(x=Borough,y=Cumsum))+
+  geom_bar(stat='identity',width=.5,fill=savnav)+
+  labs(title="Boroughs by cumulative housing deficit",y="Cumulative housing deficit",subtitle="Net additional dwellings less household formation")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,size=8),plot.title=element_text(size=11,face="bold"),plot.subtitle = element_text(size=9,face="italic"),axis.text.y=element_text(size=9),axis.title=element_text(size=9))+
+  scale_y_continuous(label=comma)
+plot(hplt)
+
+#Migration#
+mig<-read_excel("MIG.xlsx")
+t1<-mig[mig$Year == "05/06",]
+t2<-mig[mig$Year == "15/16",]
+
+plot(t1$`Net international`,t1$`Net internal`)
+plot(t2$`Net international`,t2$`Net internal`)
+
+t2<-t2[order(t2$`Net internal`),]
+t2$Borough<-factor(t2$Borough,levels=t2$Borough)
+migpltt2<-ggplot(t2,aes(x=Borough,y=`Net internal`))+
+  geom_bar(stat='identity',width=.5,fill=savmen)+
+  labs(title="Net internal migration",y="Net migration")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,size=8),plot.title=element_text(size=11,face="bold"),plot.subtitle = element_text(size=9,face="italic"),axis.text.y=element_text(size=9),axis.title=element_text(size=9))+
+  scale_y_continuous(label=comma)
+plot(migpltt2)
+
+det<-read.csv("det.csv",stringsAsFactors = FALSE)
+det2<-det[grep("E09",det$OutLA),]
+det3<-det2[grep("E09",det2$InLA),]
+
+
+
+#Migration by age#
+migage<-read_excel("migage.xlsx")
+migage<-migage[grep("E09",migage$`LA code`),]
+primmig<-migage[migage$Age %in% c("20-24","25-29","30-34"),]
+'grouping by and summarizing net renters'
+samdf<-group_by(primmig,`LA name`)
+primeage<-summarize(samdf,net.prime.renters=sum(Net))
+primeage<-primeage[order(primeage$net.prime.renters),]
+primeage$`LA name`<-factor(primeage$`LA name`,levels=primeage$`LA name`)
+primeplot<-ggplot(primeage,aes(x=`LA name`,y=net.prime.renters))+
+  geom_bar(stat='identity',width=.5,fill=savmen)+
+  labs(title="Net internal prime-age migration",y="Net figure",subtitle="2016",x="Borough")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,size=8),plot.title=element_text(size=11,face="bold"),plot.subtitle = element_text(size=9,face="italic"),axis.text.y=element_text(size=9),axis.title=element_text(size=9))+
+  scale_y_continuous(label=comma)
+plot(primeplot)
+
+#Migration by age multi-year#
+migage2<-read_excel("migage.xlsx",sheet="Mesh")
+migage2<-migage2[grep("E09",migage2$`LA code`),]
+migage2<-migage2[migage2$Age %in% c("20-24","25-29","30-34"),]
+samdf2<-group_by(migage2,`LA name`)
+primeage2<-summarize(samdf2,net.prime.renters=sum(Net))
+primeage2<-primeage2[order(primeage2$net.prime.renters),]
+primeage2$`LA name`<-factor(primeage2$`LA name`,levels=primeage2$`LA name`)
+primeplot2<-ggplot(primeage2,aes(x=`LA name`,y=net.prime.renters))+
+  geom_bar(stat='identity',width=.5,fill=savmen)+
+  labs(title="Net internal prime-age migration",y="Net figure",x="Borough",subtitle="2012:2016")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,size=8),plot.title=element_text(size=11,face="bold"),plot.subtitle = element_text(size=9,face="italic"),axis.text.y=element_text(size=9),axis.title=element_text(size=9))+
+  scale_y_continuous(label=comma)
+plot(primeplot2)
