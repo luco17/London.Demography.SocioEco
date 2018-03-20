@@ -26,7 +26,6 @@ savmen<-rgbconv(0,100,112)
 
 
 # Reading in data: set the working directory to the path where data is stored #
-setwd("c:\\personal\documents")
 age.data <- read_excel("Agefor.xlsx")
 'removing the "all age" row '
 age.data <- age.data[-20,]
