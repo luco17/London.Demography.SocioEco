@@ -1,0 +1,42 @@
+pkgs <- c("RPostgres", "DBI", "dplyr", "dbplyr", "RPostgreSQL", "ggplot2", "postGIStools")
+lapply(pkgs, library, character.only = TRUE)
+
+
+## Logging in and creating a driver ## 
+
+pw <- {
+  "xxx"
+}
+
+con <- dbConnect(PostgreSQL(), host = 'xxx', port = '5432', dbname = 'x', user = 'xxx', password = pw)
+
+# Viewing all tables within the Schema #
+dbListTables(con)
+
+# Listing all column names from the onspd table #
+tbl(con, sql("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'onspd'")) %>% print(n = 100)
+
+# Choosing the pcd table and extracting key columns #
+pcd.df <- tbl(con, sql("SELECT a.pcds, a.long, a.lat, a.osward FROM postcode.onspd as a"))
+
+#Finding long lats for a dataset#
+pcds.df <- c("SW6 7EY", "RH5 6ST")
+
+points.pcds <- pcd.df %>%
+  filter(pcds %in% pcds.df) %>% 
+  collect()
+
+#Plot covering all postcodes in the Bayswater Ward#
+fulton.pcds <- pcd.df %>%
+  filter(osward %in% "E05000638") %>%
+  collect() 'collect call required to actually pull the data from the server'
+
+Bayswater <- get_googlemap("Bayswater, UK", color = "bw", zoom = 14)
+ggmap(Bayswater) + 
+  geom_point(data = fulton.pcds, aes(x = long, y = lat), alpha = 0.4, position = "jitter") +
+  scale_x_continuous(limits = c(-0.2, -0.168), expand = c(0,0)) +
+  scale_y_continuous(limits = c(51.508, 51.52), expand = c(0,0)) +
+  theme(axis.title=element_blank(),axis.ticks=element_blank(),axis.text=element_blank())
+  
+#Disconnecting from the database#
+dbDisconnect(con2)
