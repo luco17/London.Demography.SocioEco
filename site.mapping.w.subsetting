@@ -1,0 +1,81 @@
+#Loading required packages#
+
+x<-c("ggmap","rgdal","rgeos","maptools","dplyr","tidyr","tmap","readxl", "RPostgres", "DBI", "dplyr", "dbplyr", "RPostgreSQL")
+lapply(x, require, character.only = TRUE)
+rm(x)
+
+#Colours#
+rgbconv<- function(r,g,b) {
+  d<-255
+  alpha<-r/d
+  bravo<-g/d
+  charlie<-b/d
+  defcol<-rgb(alpha,bravo,charlie)
+  return(defcol)
+}
+
+savnav<-rgbconv(0,34,68)
+savred<-rgbconv(206,24,31)
+savgre<-rgbconv(0,84,55)
+savgra<-rgbconv(60,86,105)
+
+#Reading in the data#
+df <- read_excel("site_list.xlsx")
+df_c <- read_excel("comm_list.xlsx")
+
+#Setting the google_map style from the API guide#
+style1 <- c(feature = "poi", element = "labels", visibility = "off")
+style2 <- c("&style=", feature = "road", element = "labels", visibility = "off")
+style3 <- c("&style=", feature = "road", element = "geometry", visibility = "on")
+style <- c(style1, style2, style3)
+
+#UK Map - black and white#
+Basemap <- get_googlemap(center = "Swindon, UK", color = "bw", style = style, zoom = 7)
+ggmap(Basemap)+
+  geom_point(data = subset(df, London %in% 0), aes(x = Longitude, y = Latitude, col = Status), size = 3, alpha = 0.8) +
+  scale_x_continuous(limits = c(-5.3, 1.79), expand = c(0,0))+
+  scale_y_continuous(limits = c(49.93, 52.96), expand = c(0,0))+
+  scale_color_manual(values = c(savred, savnav, savgre))+
+  theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank())
+
+#UK map - toner#
+Basemap2 <- get_map(location = "Swindon, UK", maptype = "toner", zoom = 7)
+ggmap(Basemap2)+
+  geom_point(data = subset(df, London %in% 0), aes(x = Longitude, y = Latitude, col = Status), size = 3, alpha = 0.8) +
+  scale_x_continuous(limits = c(-5.3, 1.79), expand = c(0,0))+
+  scale_y_continuous(limits = c(49.93, 52.96), expand = c(0,0))+
+  scale_color_manual(values = c(savred, savnav, savgre))+
+  theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank())
+  
+#London map - black and white#
+Londonmap <- get_googlemap(center = "London, UK", color = "bw", style = style, zoom = 10)
+ggmap(Londonmap)+
+  geom_point(data = subset(df, London %in% 1), aes(x = Longitude, y = Latitude, col = Status, size = Units)) +
+  geom_polygon(data = lnd_f, aes(x = long, y = lat, group = group), color = savgra, lwd = 0.5, alpha = 0.1, fill = NA) +
+  theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank()) +
+  scale_color_manual(values = c(savred, savnav, savgre)) +
+  scale_size(range = c(2, 6)) +
+  guides(size = FALSE, col = FALSE)
+
+#London map - toner#
+Londonmap2 <- get_map(location = "London, UK", maptype = "toner")
+ggmap(Londonmap2)+
+  geom_point(data = subset(df, London %in% 1), aes(x = Longitude, y = Latitude, col = Status, size = Units)) +
+  geom_polygon(data = lnd_f, aes(x = long, y = lat, group = group), color = savgra, lwd = 0.5, alpha = 0.1, fill = NA) +
+  theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank()) +
+  scale_color_manual(values = c(savred, savnav, savgre)) +
+  scale_size(range = c(2, 6)) +
+  guides(size = FALSE, col = FALSE)
+
+# Getting long lats for the commercial sheet # 
+
+x <- geocode(df_c$PCD)
+df_c <- cbind(df_c,x)
+rm(x)
+
+# Plotting commercial points #
+
+ggmap(Basemap) + 
+  geom_point(data = df_c, aes(x = long, y = lat), size = 4, alpha = 0.9, col = savnav) +
+  scale_y_continuous(limits = c(50, 53), expand = c(0,0)) +
+  theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank())
