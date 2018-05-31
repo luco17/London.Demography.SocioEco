@@ -79,3 +79,4 @@ ggmap(Basemap) +
   geom_point(data = df_c, aes(x = long, y = lat), size = 4, alpha = 0.9, col = savnav) +
   scale_y_continuous(limits = c(50, 53), expand = c(0,0)) +
   theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank())
+  
