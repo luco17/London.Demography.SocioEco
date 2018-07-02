@@ -65,3 +65,47 @@ measures %>%
   write.csv("pop_96_15_routput.csv", row.names = FALSE)
 
 rm(list = ls())
+
+#Working on the larger LA population dataset#
+
+df1 <- read_csv("detailed_pop_2016_LOD.csv") %>% filter(country == "E")
+
+#test grepl call to find only London boroughs#
+df1[grepl(pattern = "^E09", df1$lad2014_code),]
+
+#Subsequent creation of the datasets for later analysis#
+e_u20_2 <- df1 %>%
+  filter(Age < 20) %>%
+  summarise_at(vars(population_2001:population_2016), funs(sum))
+
+e_targ_2 <- df1 %>%
+  filter(Age >= 20 & Age < 35) %>%
+  summarise_at(vars(population_2001:population_2016), funs(sum))
+  
+e_o35_2 <- df1 %>%
+  filter(Age >= 35) %>%
+  summarise_at(vars(population_2001:population_2016), funs(sum))
+
+ldn_u20_2 <- df1 %>%
+  filter(grepl("^E09", lad2014_code), Age < 20) %>%
+  summarise_at(vars(population_2001:population_2016), funs(sum))
+
+ldn_targ_2 <- df1 %>%
+  filter(grepl("^E09", lad2014_code), Age >= 20 & Age < 35) %>%
+  summarise_at(vars(population_2001:population_2016), funs(sum))
+
+ldn_o35_2 <- df1 %>%
+  filter(grepl("^E09", lad2014_code), Age >= 35) %>%
+  summarise_at(vars(population_2001:population_2016), funs(sum))
+
+#Listing#
+measures_2 <- list(e_u20_2 = e_u20_2, e_targ_2 = e_targ_2, e_o35_2 = e_o35_2, ldn_u20_2 = ldn_u20_2, ldn_targ_2 = ldn_targ_2, ldn_o35_2 = ldn_o35_2)
+
+#using purrr::map() and tidyr::gather() to clean the data. dplyr::mutate() used with base::substr() to create a column of years#
+measures_2 %>%
+  map_df(~ gather(data = ., key = "year", value = "pop_count"), .id = "measure") %>%
+  mutate(year = as.factor(substr(year, start = 12, stop = 15))) %>% 
+  spread(key = "year", value = "pop_count") %>% 
+  write.csv("pop_01_16_routput.csv", row.names = FALSE)
+  
+  rm(list = ls())
