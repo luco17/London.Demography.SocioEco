@@ -1,0 +1,67 @@
+pkgs <- c("tidyr", "dplyr", "readr", "purrr", "readxl")
+lapply(pkgs, require, character.only = TRUE)
+rm(pkgs)
+
+#Use setwd() to location of the excel file, fine current wd using getwd()#
+
+df2 <- read_excel("SYOA_EW_MASTER_19912015.xlsx", n_max = 300)
+df2 <- (df2[!is.na(df2$`GOVERNMENT OFFICE REGIONS`),])
+
+#Creating a column of years#
+df2$stat_count <- cumsum(df2$`GOVERNMENT OFFICE REGIONS` == "NORTH EAST")
+df2$year <- 1990 + df2$stat_count
+
+#Test correct figures are present#
+df2 %>%
+  select(PERSONS, year, `GOVERNMENT OFFICE REGIONS`) %>%
+  filter(year == 2015, `GOVERNMENT OFFICE REGIONS` == "WALES")
+
+#Using tidyr::gather() to convert the dataframe for easy analysis#
+df2 <- df2 %>%
+  select(-c(PERSONS, MALES, FEMALES, stat_count)) %>%
+  filter(`GOVERNMENT OFFICE REGIONS` != "WALES") %>%
+  gather(key = "Measure", value = "pop_count", MALES__1:FEMALES__91) %>%
+  mutate(Measure = as.numeric(substr(Measure, regexpr(pattern = "__", Measure) + 2, stop = nchar(Measure))) - 1) %>%
+  mutate(pop_count = as.numeric(pop_count))
+  
+#Creating EW age categories#
+e_targ <- df2 %>%
+  group_by(year) %>%
+  filter(Measure >= 20 & Measure < 35, year >= 1996) %>%
+  summarise(pop_count_year = sum(pop_count, na.rm = TRUE))
+
+e_u20 <- df2 %>%
+  group_by(year) %>%
+  filter(Measure <20, year >= 1996) %>%
+  summarise(pop_count_year = sum(pop_count, na.rm = TRUE))
+
+e_o35 <- df2 %>%
+  group_by(year) %>%
+  filter(Measure >= 35, year >= 1996) %>%
+  summarise(pop_count_year = sum(pop_count, na.rm = TRUE))
+
+#LDN age categories#
+ldn_targ <- test %>%
+  group_by(year) %>%
+  filter(Measure >= 20 & Measure < 35, year >= 1996, `GOVERNMENT OFFICE REGIONS` == "LONDON") %>%
+  summarise(pop_count_year = sum(pop_count, na.rm = TRUE))
+
+ldn_u20 <- df2 %>%
+  group_by(year) %>%
+  filter(Measure <20, year >= 1996, `GOVERNMENT OFFICE REGIONS` == "LONDON") %>%
+  summarise(pop_count_year = sum(pop_count, na.rm = TRUE))
+
+ldn_o35 <- df2 %>%
+  group_by(year) %>%
+  filter(Measure >= 35, year >= 1996, `GOVERNMENT OFFICE REGIONS` == "LONDON") %>%
+  summarise(pop_count_year = sum(pop_count, na.rm = TRUE))
+
+#Combining them into a list ready for manipulation with purrr::map()#
+measures <- list(e_targ = e_targ, e_u20 = e_u20, e_o35 = e_o35, ldn_targ = ldn_targ, ldn_u20 = ldn_u20, ldn_o35 = ldn_o35)
+
+measures %>%
+  map_df(~ rbind(data = .), .id = "measure") %>%
+  spread(key = year, value = pop_count_year) %>% 
+  write.csv("pop_96_15_routput.csv", row.names = FALSE)
+
+rm(list = ls())
